@@ -1,0 +1,59 @@
+import numpy as np
+import scipy as sc
+from scipy import integrate
+import matplotlib as plt
+
+def u_1(x):
+    return np.heaviside(x,1)
+
+def u_2(x):
+    return np.heaviside(x,2)
+
+def d(x):
+    c = 4.01 - 0.28*x
+    d = 0.1185*c
+    return d 
+
+def T_inf(x):
+    if x > b_eng:
+        r = 0
+    else:
+        r = 1
+    return r
+
+def q(x):
+    q = 5*x^2+30*x
+    return q
+
+def qd(x):
+    qd = d(x)*q(x)
+    return qd
+
+#input correct values   
+thrust = 64000
+engine_vertical_distance = 0.8
+span  = 7.01
+b_eng = 3.87
+W_eng = 1100
+c_eng = 0.05
+
+def torsion():
+        torsion_lst = []
+        x_lst = []
+        for x in range(0,span,0.01):
+              shear_accum = sc.integrate.quad(qd,x,span)
+              thrust_point_force = T_inf(x)* thrust * engine_vertical_distance
+              engine_W_force = T_inf(x)*W_eng*c_eng
+              torsion = shear_accum + engine_W_force - thrust_point_force
+              append.torsion_lst(torsion)
+              append.x_lst(x)
+
+        plt.plot(x_lst,torsion_list)
+        plt.title("torsion distribution")
+        plt.ylabel("Torsion")
+        plt.xlabel("span position")
+        plt.show()
+
+        return torsion_list,x_lst
+
+
