@@ -1,16 +1,22 @@
+import math
 import pandas as pd
 import scipy as sp
-from scipy import interpolate
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+from scipy import interpolate
+from scipy.optimize import curve_fit  
 
-V=226
-rho=1.225
+#flight conditions (cruise) 
+V=285.5
+rho=0.3796
+n=2.5
+
 q=0.5*rho*V**2
 cr=4.03
 ct=1.29
-b=21.82  
+b=21.82
+S=58.068
+W=25256 
 
 class Loads:
 
@@ -27,6 +33,8 @@ class Loads:
         self.y_Cl_inter = sp.interpolate.interp1d(self.ylist, self.Cllst, kind = 'linear', fill_value= "extrapolate")
         self.y_Cd_inter = sp.interpolate.interp1d(self.ylist, self.Cdlst, kind = 'linear', fill_value= "extrapolate")
         self.y_Cm_inter = sp.interpolate.interp1d(self.ylist, self.Cmlst, kind = 'linear', fill_value= "extrapolate")
+
+        print(len(self.ylist))
 
     def open_file(self):
         with open(self.file) as file:
@@ -56,7 +64,7 @@ class Load_Equations:
         self.y_data=np.array([data[i][0] for i in range(len(data))])
 
         #Fit the data to the equation
-        self.degree = 9
+        self.degree = 12
         self.params, self.covariance = curve_fit(lambda x, *p: self.polynomial(x, *p), self.x_data, self.y_data, p0=[1]*(self.degree + 1))
 
         #Generate x values for the fitted curve
@@ -74,15 +82,15 @@ class Load_Equations:
         plt.figure(figsize=(14, 6))
         
         plt.subplot(1,2,1)
-        plt.scatter(self.x_data, self.y_data, color='blue', label='Design Load Data')
+        plt.scatter(self.x_data, self.y_data, color='blue', label='desired Load Data')
         plt.plot(self.x_fit, self.y_fit, color='red')
-        plt.title('Design Load Curve')
+        plt.title('desired Load Curve')
         plt.xlabel('x')
         plt.ylabel('y')
         plt.legend()
         plt.grid()
 
-        x = np.linspace(0, 10.8, 500)
+        x = np.linspace(0, 10.91, 500)
         coeffs = self.params
         y = np.polyval(coeffs, x)
         
@@ -91,7 +99,7 @@ class Load_Equations:
         plt.xlabel("x")
         plt.ylabel("Load Value")
         plt.title("Fitted Curve")
-        plt.xlim(0, 10.8)  
+        plt.xlim(0, 10.91)  
         plt.legend()
         plt.grid(True)
 
@@ -104,41 +112,44 @@ class Load_Equations:
 a0=Loads(r"MainWing_a0.txt")
 a10=Loads(r"MainWing_a10.txt")
 
-Cl_0_y = a0.y_Cl_inter
-Cl_10_y = a10.y_Cl_inter
-Cl_d =  0.4         #These are dependend on the load case
+Cl_d=2*n*W*9.80665/(V**2*rho*S)*1.1 
 Cl_0 =  a0.CL       
 Cl_10 =  a10.CL     
 K = ((Cl_d - Cl_0)/(Cl_10 - Cl_0))
 
-def design_lift(y):
+def desired_lift(y):
     return a0.y_Cl_inter(y) + K * (a10.y_Cl_inter(y) - a0.y_Cl_inter(y))
 
-def design_drag(y):
+def desired_drag(y):
     return a0.y_Cd_inter(y) + K**2 * (a10.y_Cd_inter(y) - a0.y_Cd_inter(y))
 
-def design_moment(y):
+def desired_moment(y):
     return a0.y_Cm_inter(y) + K * (a10.y_Cm_inter(y) - a0.y_Cm_inter(y))
 
-def desired_AOA(Cl_d, Cl_10, Cl_0):
-    return ((Cl_d-Cl_10)/(Cl_10-Cl_0))*10
+def desired_AOA():
+    return ((Cl_d-Cl_0)/(Cl_10-Cl_0))*10
 
-spanwise_design_lift = [(float(design_lift(y))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
-spanwise_design_drag = [(float(design_drag(y))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
-spanwise_design_moment = [(float(design_moment(y))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
+print(desired_AOA())
 
-a_d = desired_AOA (Cl_d, Cl_10, Cl_0)
+spanwise_desired_lift = [((float(desired_lift(y))*math.cos(desired_AOA()*math.pi/180)+float(desired_drag(y))*math.sin(desired_AOA()*math.pi/180))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
+spanwise_desired_drag = [((-float(desired_lift(y))*math.sin(desired_AOA()*math.pi/180)+float(desired_drag(y))*math.cos(desired_AOA()*math.pi/180))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
+spanwise_desired_moment = [(float(desired_moment(y))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)] #moment about quarter chord is not affected by angle of attack 
 
-spanwise_lift=Load_Equations(spanwise_design_lift)
+a_d = desired_AOA()
+print("desired angle of attack")
+print(a_d)
+
+spanwise_lift=Load_Equations(spanwise_desired_lift)
 print("spanwise_lift")
-print(spanwise_lift.params)
+print([float(i) for i in spanwise_lift.params])
 print()
 
-spanwise_drag=Load_Equations(spanwise_design_drag)
+spanwise_drag=Load_Equations(spanwise_desired_drag)
 print("spanwise_drag")
 print(spanwise_drag.params)
 print()
 
-spanwise_moment=Load_Equations(spanwise_design_moment)
+spanwise_moment=Load_Equations(spanwise_desired_moment)
 print("spanwise_moment")
 print(spanwise_moment.params)
+
