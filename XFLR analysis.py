@@ -112,7 +112,7 @@ class Load_Equations:
 a0=Loads(r"MainWing_a0.txt")
 a10=Loads(r"MainWing_a10.txt")
 
-Cl_d=2*n*W*9.80665/(V**2*rho*S)*1.1 
+Cl_d=2*W*9.80665/(V**2*rho*S)*1.1 
 Cl_0 =  a0.CL       
 Cl_10 =  a10.CL     
 K = ((Cl_d - Cl_0)/(Cl_10 - Cl_0))
@@ -153,3 +153,9 @@ spanwise_moment=Load_Equations(spanwise_desired_moment)
 print("spanwise_moment")
 print(spanwise_moment.params)
 
+def Wing_Lift(x):
+    return sum([spanwise_lift.params[i] * x**(len(spanwise_lift.params)-1-i) for i in range(len(spanwise_lift.params))])*n
+
+estimate,error = sp.integrate.quad(function,0,10.91)
+
+print(estimate*2,error)
