@@ -59,12 +59,12 @@ class Loads:
 
 class Load_Equations:
 
-    def __init__(self, data):
+    def __init__(self, data, degree):
         self.x_data=np.array([data[i][2] for i in range(len(data))])
         self.y_data=np.array([data[i][0] for i in range(len(data))])
 
         #Fit the data to the equation
-        self.degree = 12
+        self.degree = degree
         self.params, self.covariance = curve_fit(lambda x, *p: self.polynomial(x, *p), self.x_data, self.y_data, p0=[1]*(self.degree + 1))
 
         #Generate x values for the fitted curve
@@ -78,6 +78,9 @@ class Load_Equations:
         result = sum([params[i] * x**(degree - i) for i in range(degree + 1)])
         return result
 
+    def function(self,x):
+        return sum([self.params[i]*x**(len(self.params)-1-i) for i in range(len(self.params))])
+ 
     def plot_equation(self):
         plt.figure(figsize=(14, 6))
         
@@ -90,12 +93,10 @@ class Load_Equations:
         plt.legend()
         plt.grid()
 
-        x = np.linspace(0, 10.91, 500)
-        coeffs = self.params
-        y = np.polyval(coeffs, x)
+        x = np.linspace(0, 10.91, 1000)
         
         plt.subplot(1,2,2)
-        plt.plot(x,y, label="Spanwise Load", color="b", linewidth=2)
+        plt.plot(x,self.function(x), label="Spanwise Load", color="b", linewidth=2)
         plt.xlabel("x")
         plt.ylabel("Load Value")
         plt.title("Fitted Curve")
@@ -107,12 +108,12 @@ class Load_Equations:
         plt.show()
 
     def get_equation(self):
-        return '+'.join([(str(round(self.params[i],4))+"*x^"+str(len(self.params)-i-1)) for i in range(len(self.params))]).replace("+-","-")
+        return '+'.join([(str(round(self.params[i],4))+"*x**"+str(len(self.params)-i-1)) for i in range(len(self.params))]).replace("+-","-")
 
 a0=Loads(r"MainWing_a0.txt")
 a10=Loads(r"MainWing_a10.txt")
 
-Cl_d=2*W*9.80665/(V**2*rho*S)*1.1 
+Cl_d=2*n*W*9.80665/(V**2*rho*S)*1.1 
 Cl_0 =  a0.CL       
 Cl_10 =  a10.CL     
 K = ((Cl_d - Cl_0)/(Cl_10 - Cl_0))
@@ -133,29 +134,33 @@ print(desired_AOA())
 
 spanwise_desired_lift = [((float(desired_lift(y))*math.cos(desired_AOA()*math.pi/180)+float(desired_drag(y))*math.sin(desired_AOA()*math.pi/180))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
 spanwise_desired_drag = [((-float(desired_lift(y))*math.sin(desired_AOA()*math.pi/180)+float(desired_drag(y))*math.cos(desired_AOA()*math.pi/180))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)]
-spanwise_desired_moment = [(float(desired_moment(y))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)] #moment about quarter chord is not affected by angle of attack 
+spanwise_desired_moment = [(float(desired_moment(y))*q*(cr-((cr-ct)*2/b)*float(y)),(cr-((cr-ct)*2/b)*float(y)),float(y)) for y in np.arange(0,10.91,0.2)] #moment about quarter chord is not affected by angle of attack (assumed aerodynamic chord and quarter chord location coincide) 
 
 a_d = desired_AOA()
 print("desired angle of attack")
 print(a_d)
 
-spanwise_lift=Load_Equations(spanwise_desired_lift)
+spanwise_lift=Load_Equations(spanwise_desired_lift, 7)
 print("spanwise_lift")
+print(spanwise_lift.get_equation())
 print([float(i) for i in spanwise_lift.params])
 print()
 
-spanwise_drag=Load_Equations(spanwise_desired_drag)
+spanwise_drag=Load_Equations(spanwise_desired_drag, 6)
 print("spanwise_drag")
-print(spanwise_drag.params)
+print(spanwise_drag.get_equation())
+print([float(i) for i in spanwise_drag.params])
 print()
 
-spanwise_moment=Load_Equations(spanwise_desired_moment)
+spanwise_moment=Load_Equations(spanwise_desired_moment, 7)
 print("spanwise_moment")
-print(spanwise_moment.params)
+print(spanwise_moment.get_equation())
+print([float(i) for i in spanwise_moment.params])
+print() 
 
 def Wing_Lift(x):
     return sum([spanwise_lift.params[i] * x**(len(spanwise_lift.params)-1-i) for i in range(len(spanwise_lift.params))])*n
 
-estimate,error = sp.integrate.quad(function,0,10.91)
+estimate,error = sp.integrate.quad(Wing_Lift,0,10.91) 
 
 print(estimate*2,error)
