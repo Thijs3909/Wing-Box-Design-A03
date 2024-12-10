@@ -10,7 +10,7 @@ class Load_Equations:
         self.y_data = np.array(y_values)
 
         # Fit the data to the equation
-        self.degree = 9
+        self.degree = 5
         self.params, self.covariance = curve_fit(lambda x, *p: self.polynomial(x, *p), self.x_data, self.y_data,
                                                  p0=[1] * (self.degree + 1))
 
@@ -37,7 +37,7 @@ class Load_Equations:
         plt.legend()
         plt.grid()
 
-        x = np.linspace(0, 10.92, 500)
+        x = np.linspace(0, 10.92, 1000)
         coeffs = self.params
         y = np.polyval(coeffs, x)
 
@@ -57,20 +57,24 @@ class Load_Equations:
         return '+'.join([(str(round(self.params[i], 4)) + "*x^" + str(len(self.params) - i - 1)) for i in
                          range(len(self.params))]).replace("+-", "-")
 
+params = [0.031146807213254215, -0.9734557304800973, 11.46410433320769, -59.679379592049216, 95.23366768716704, 366.2564395680214, -1299.414656348635, -13516.355300199872]
 def lift_force(y):
-    return -0.009*y**9 + 0.4046*y**8 - 7.6186*y**7 + 77.8078*y**6 - 467.1308*y**5 + 1668.4206*y**4 - 3390.1253*y**3 + 3055.7823*y**2 - 354.9261*y + 53705.8879
+    return (sum([params[i] * y**(len(params)-1-i) for i in range(len(params))]))
+
+
+
 
 def weight_force(y):
-    return 1799 - 112*y
+    return (4652.7156 - 289.69*y)
 
 # Ask user for inputs
-wing_length = float(input("Enter the length of the wing (in meters): "))
+wing_length = 10.92
 num_point_forces = int(input("Enter the number of point shear forces: "))
 point_forces = []
 
 for i in range(num_point_forces):
     location = float(input(f"Enter the location of point force {i+1} along the wing (in meters): "))
-    magnitude = float(input(f"Enter the magnitude of point force {i+1} (positive for downward, negative for upward): "))
+    magnitude = -float(input(f"Enter the magnitude of point force {i+1} (positive for downward, negative for upward): "))
     point_forces.append((location, magnitude))
 
 # Set up the y-axis (spanwise direction)
@@ -81,10 +85,16 @@ lift = lift_force(y)
 weight = weight_force(y)
 distributed_force = lift - weight  # Net distributed force (z direction)
 
+
 # Calculate total distributed load and moment due to distributed forces
 dy = y[1] - y[0]  # Spanwise step
 total_distributed_load = np.sum(distributed_force * dy)
 total_distributed_moment = np.sum(distributed_force * y * dy)
+
+
+#test integral for lift
+#lift_test = np.sum(lift*dy)
+#print(f"the total lift is {lift_test}")
 
 # Add contributions from point forces
 total_point_load = sum(magnitude for _, magnitude in point_forces)
@@ -93,7 +103,7 @@ total_point_moment = sum(location * magnitude for location, magnitude in point_f
 # Calculate reaction forces at root (y=0)
 reaction_force = -(total_distributed_load + total_point_load)  # Vertical force balance
 reaction_moment = (total_distributed_moment + total_point_moment)  # Moment balance about root
-print(f"The reaction force is {reaction_force} and the reaction moment is {reaction_moment}")
+#print(f"The reaction force is {reaction_force} and the reaction moment is {reaction_moment}")
 
 # Initialize arrays for shear force and bending moment
 shear_force = np.zeros_like(y)
@@ -116,29 +126,31 @@ for location, magnitude in point_forces:
         bending_moment[j] += magnitude * (y[j] - location)
 
 
-print(shear_force[0])
-print(bending_moment[0])
+#print(shear_force[0])
+#print(bending_moment[0])
 
+
+#uncomment for moment curve equation
 moment_curve_fit = Load_Equations(bending_moment,y)
 print(moment_curve_fit.params)
-print(moment_curve_fit.get_equation())
+print(f"The equation for the moment curve is: {moment_curve_fit.get_equation()}")
 
 
 # Plot the diagrams
 plt.figure(figsize=(12, 8))
 
 # Plot distributed force
-plt.subplot(3, 1, 1)
-plt.plot(y, distributed_force, label="Distributed Force (Lift - Weight)")
-plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
-plt.title("Distributed Force along Wing Span")
-plt.xlabel("Spanwise Location y (m)")
-plt.ylabel("Force (N/m)")
-plt.legend()
-plt.grid()
+#plt.subplot(3, 1, 1)
+#plt.plot(y, distributed_force, label="Distributed Force (Lift - Weight)")
+#plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
+#plt.title("Distributed Force along Wing Span")
+#plt.xlabel("Spanwise Location y (m)")
+#plt.ylabel("Force (N/m)")
+#plt.legend()
+#plt.grid()
 
 # Plot shear force
-plt.subplot(3, 1, 2)
+plt.subplot(2, 1, 1)
 plt.plot(y, shear_force, label="Shear Force", color='orange')
 plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
 plt.title("Shear Force Diagram")
@@ -148,7 +160,7 @@ plt.legend()
 plt.grid()
 
 # Plot bending moment
-plt.subplot(3, 1, 3)
+plt.subplot(2, 1, 2)
 plt.plot(y, bending_moment, label="Bending Moment", color='green')
 plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
 plt.title("Bending Moment Diagram")
@@ -157,5 +169,19 @@ plt.ylabel("Bending Moment (N·m)")
 plt.legend()
 plt.grid()
 
+
 plt.tight_layout()
+plt.savefig('shear_moment_graph')
 plt.show()
+
+
+
+#print(bending_moment)
+#print("*"*100)
+#print(y)
+
+np.savetxt("bending_moment_values",bending_moment, fmt = "%e")
+np.savetxt("x_values",y, fmt = "%e")
+
+#print(y)
+#print("done")
